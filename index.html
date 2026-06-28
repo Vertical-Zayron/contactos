@@ -21,6 +21,10 @@
 <!-- Mapas: Leaflet + OpenStreetMap (sin llave) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Agrupacion de pines (escala a muchos contactos) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <style>
 :root{
@@ -237,6 +241,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .legend .lg b{margin-left:auto;font-family:var(--font-mono);font-weight:600}
 .map-note{margin-top:13px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:9px}
 .map-note svg{color:var(--signal);flex-shrink:0}
+.more-wrap{display:flex;justify-content:center;margin-top:18px}
+.more-wrap .btn{padding:0 22px;height:40px}
+.count-note{text-align:center;margin-top:16px;font-family:var(--font-mono);font-size:11.5px;color:var(--faint)}
 .leaflet-container{font-family:var(--font-ui)}
 .pin-wrap{background:none;border:none}
 .mp{min-width:170px}
@@ -390,6 +397,9 @@ const TYPES={
 /* ════════════ ESTADO ════════════ */
 let SESSION={token:null,profile:null,role:"Invitado"};
 const STATE={view:"list",type:"all",q:""};
+const PAGE=60;          // tarjetas por bloque en la vista de lista
+let shown=PAGE;         // cuántas se muestran actualmente
+function resetPage(){shown=PAGE;}
 const TYPE_COLORS={cliente:"#0e94a8",proveedor:"#2d54d4",prospecto:"#dd8a2b",otro:"#8c99a6"};
 const CR_CENTER=[9.7489,-83.7534]; // Costa Rica
 let viewMap=null,formMap=null,formMarker=null,formLoc={lat:null,lng:null};
@@ -528,7 +538,12 @@ function render(){
         <div class="grid">${cs.map(contactCard).join("")}</div>
       </div>`).join("");
   }else{
-    box.innerHTML=`<div class="grid">${list.map(contactCard).join("")}</div>`;
+    const slice=list.slice(0,shown);
+    const more=list.length-slice.length;
+    box.innerHTML=`<div class="grid">${slice.map(contactCard).join("")}</div>`+
+      (more>0
+        ? `<div class="more-wrap"><button class="btn" id="loadMore">Mostrar más · ${more} restantes</button></div>`
+        : `<div class="count-note">${list.length} contacto(s)</div>`);
   }
 }
 
@@ -549,16 +564,19 @@ function renderMap(list){
   if(typeof L==="undefined"){box.innerHTML='<div class="empty"><div class="ei">🗺️</div><h3>Mapa no disponible</h3><p>No se pudo cargar la librería de mapas. Revisa tu conexión.</p></div>';return;}
   viewMap=L.map("bigMap",{scrollWheelZoom:true}).setView(CR_CENTER,7);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(viewMap);
+  const cluster = L.markerClusterGroup ? L.markerClusterGroup({chunkedLoading:true,maxClusterRadius:48,showCoverageOnHover:false}) : null;
   const pts=[];
   withLoc.forEach(c=>{
-    const m=L.marker([c.lat,c.lng],{icon:pinIcon(TYPE_COLORS[c.tipo||"otro"])}).addTo(viewMap);
+    const m=L.marker([c.lat,c.lng],{icon:pinIcon(TYPE_COLORS[c.tipo||"otro"])});
     m.bindPopup(`<div class="mp"><div class="mp-name">${esc(c.nombre||"")}</div>
       <div class="mp-sub">${esc([(TYPES[c.tipo||"otro"]||TYPES.otro).label,c.empresa].filter(Boolean).join(" · "))}</div>
       ${c.correo?`<div class="mp-row">${esc(c.correo)}</div>`:""}
       ${c.telefono?`<div class="mp-row">${esc(c.telefono)}</div>`:""}
       <button class="mp-btn" onclick="openForm('${c.id}')">Ver / editar</button></div>`);
+    if(cluster)cluster.addLayer(m); else m.addTo(viewMap);
     pts.push([c.lat,c.lng]);
   });
+  if(cluster)viewMap.addLayer(cluster);
   if(pts.length===1)viewMap.setView(pts[0],14);
   else if(pts.length>1)viewMap.fitBounds(pts,{padding:[50,50],maxZoom:15});
   setTimeout(()=>viewMap&&viewMap.invalidateSize(),150);
@@ -733,24 +751,26 @@ function toast(html){const w=$("#toasts");const t=document.createElement("div");
 /* ════════════ INTERACCIÓN ════════════ */
 function bindUI(){
   document.body.addEventListener("click",e=>{
+    if(e.target.closest("#loadMore")){shown+=PAGE;render();return;}
     const card=e.target.closest(".contact");if(card)openForm(card.dataset.id);
   });
   $("#newBtn").onclick=()=>openForm();
-  $("#syncBtn").onclick=async()=>{toast("Sincronizando…");await reload();toast("Actualizado");};
+  $("#syncBtn").onclick=async()=>{toast("Sincronizando…");resetPage();await reload();toast("Actualizado");};
   $("#typeChips").addEventListener("click",e=>{
     const b=e.target.closest(".fchip");if(!b)return;
-    STATE.type=b.dataset.type;
+    STATE.type=b.dataset.type;resetPage();
     $$("#typeChips .fchip").forEach(x=>x.classList.toggle("on",x===b));
     render();
   });
   $("#viewToggle").addEventListener("click",e=>{
     const b=e.target.closest("button");if(!b)return;
-    STATE.view=b.dataset.view;
+    STATE.view=b.dataset.view;resetPage();
     $$("#viewToggle button").forEach(x=>x.classList.toggle("on",x===b));
     render();
   });
   const search=$("#search");
-  search.addEventListener("input",()=>{STATE.q=search.value.trim();render();});
+  const deb=(fn,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};};
+  search.addEventListener("input",deb(()=>{STATE.q=search.value.trim();resetPage();render();},150));
   document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();search.focus();}});
   // menú
   const menu=$("#userMenu");
