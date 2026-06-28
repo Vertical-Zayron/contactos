@@ -244,6 +244,22 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .more-wrap{display:flex;justify-content:center;margin-top:18px}
 .more-wrap .btn{padding:0 22px;height:40px}
 .count-note{text-align:center;margin-top:16px;font-family:var(--font-mono);font-size:11.5px;color:var(--faint)}
+
+/* ════ POR REVISAR ════ */
+.review{border:1px solid #f1dca8;background:linear-gradient(180deg,#fffdf7,#fdf6e9);border-radius:var(--r);padding:16px 16px 18px;margin-bottom:22px}
+.review-head{display:flex;align-items:center;gap:11px;margin-bottom:14px;flex-wrap:wrap}
+.review-head .ri{width:32px;height:32px;border-radius:9px;background:var(--signal);color:#fff;display:grid;place-items:center;flex-shrink:0}
+.review-head .rt{font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--signal-ink)}
+.review-head .rc{font-family:var(--font-mono);font-size:11px;color:var(--signal-ink);background:#fff;border:1px solid #f0d9a8;border-radius:999px;padding:2px 9px}
+.review-head .rs{font-size:12.5px;color:var(--signal-ink);margin-left:auto}
+.contact.rev{border-color:#f1dca8;background:#fffefb}
+.type-badge.rev-badge{background:var(--signal);color:#fff}
+.rev-actions{display:flex;align-items:center;gap:11px;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line)}
+.rev-btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--signal-ink);background:#fff;border:1px solid #f0d9a8;border-radius:8px;padding:6px 11px;transition:.15s}
+.rev-btn:hover{background:var(--signal);color:#fff;border-color:var(--signal)}
+.rev-btn.ghost{color:var(--muted);border-color:var(--line)}
+.rev-btn.ghost:hover{background:var(--warn);color:#fff;border-color:var(--warn)}
+.rev-hint{font-size:11.5px;color:var(--faint)}
 .leaflet-container{font-family:var(--font-ui)}
 .pin-wrap{background:none;border:none}
 .mp{min-width:170px}
@@ -320,6 +336,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
   <div class="menu" id="userMenu" hidden>
     <div class="mhead"><div class="e" id="mName">—</div><div class="s" id="mEmail">—</div></div>
     <button class="mi" id="openDrive"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z"/></svg>Abrir carpeta en Drive</button>
+    <button class="mi" id="syncGoogleBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3-3-3 3M19 8v8"/></svg>Sincronizar con Google Contacts</button>
     <button class="mi" id="exportBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>Exportar CSV</button>
     <button class="mi danger" id="signoutBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>Cerrar sesión</button>
   </div>
@@ -412,10 +429,10 @@ const LS_KEY="sayron_contactos";
 function lsGet(){try{return JSON.parse(localStorage.getItem(LS_KEY))||[]}catch(e){return DB._mem||[]}}
 function lsSet(v){try{localStorage.setItem(LS_KEY,JSON.stringify(v))}catch(e){DB._mem=v}}
 
-function jsonp(params){
+function jsonp(params,timeoutMs){
   return new Promise((resolve,reject)=>{
     const cb="__jp_"+Math.random().toString(36).slice(2);
-    const t=setTimeout(()=>{cleanup();reject(new Error("timeout"))},15000);
+    const t=setTimeout(()=>{cleanup();reject(new Error("timeout"))},timeoutMs||15000);
     function cleanup(){clearTimeout(t);delete window[cb];if(s.parentNode)s.remove();}
     window[cb]=d=>{cleanup();resolve(d);};
     const qs=new URLSearchParams({...params,callback:cb}).toString();
@@ -457,6 +474,11 @@ const DB={
     this.cache=this.cache.filter(x=>x.id!==id);
     if(USE_DRIVE())await post({action:"delete",collection:APP_CONFIG.tool.collection,id});
     else lsSet(this.cache);
+  },
+  async ignore(id){
+    this.cache=this.cache.filter(x=>x.id!==id);
+    if(USE_DRIVE())await post({action:"ignore",collection:APP_CONFIG.tool.collection,id});
+    else lsSet(this.cache);
   }
 };
 
@@ -467,15 +489,20 @@ function fmtDate(d){if(!d)return"";const x=new Date(d+"T00:00:00");return isNaN(
 function companyKey(c){return (c.empresa||"").trim();}
 
 /* ════════════ RENDER ════════════ */
+function matchSearch(c){
+  if(!STATE.q)return true;
+  const q=STATE.q.toLowerCase();
+  return [c.nombre,c.empresa,c.cargo,c.correo,c.telefono,c.lugar,c.ubicacion,c.notas,(c.etiquetas||[]).join(" ")]
+    .some(v=>v&&String(v).toLowerCase().includes(q));
+}
 function filtered(){
   let list=DB.cache.slice();
   if(STATE.type!=="all")list=list.filter(c=>(c.tipo||"otro")===STATE.type);
-  if(STATE.q){
-    const q=STATE.q.toLowerCase();
-    list=list.filter(c=>[c.nombre,c.empresa,c.cargo,c.correo,c.telefono,c.lugar,c.ubicacion,c.notas,(c.etiquetas||[]).join(" ")]
-      .some(v=>v&&String(v).toLowerCase().includes(q)));
-  }
+  if(STATE.q)list=list.filter(matchSearch);
   return list;
+}
+function pendingReview(){
+  return DB.cache.filter(c=>c._revisar&&matchSearch(c)).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
 }
 function renderStats(){
   const all=DB.cache;
@@ -493,12 +520,12 @@ function renderStats(){
 function contactCard(c){
   const t=c.tipo||"otro";
   const met=[c.lugar,fmtDate(c.fecha)].filter(Boolean).join(" · ");
-  return `<div class="contact" data-id="${c.id}">
+  return `<div class="contact${c._revisar?' rev':''}" data-id="${c.id}">
     <div class="c-top">
       <div class="avatar t-${t}">${esc(initials(c.nombre))}</div>
       <div class="c-id"><div class="c-name">${esc(c.nombre||"(sin nombre)")}</div>
         <div class="c-sub">${esc([c.cargo,c.empresa].filter(Boolean).join(" · ")||"—")}</div></div>
-      <span class="type-badge t-${t}">${esc((TYPES[t]||TYPES.otro).label)}</span>
+      ${c._revisar?'<span class="type-badge rev-badge">Por revisar</span>':`<span class="type-badge t-${t}">${esc((TYPES[t]||TYPES.otro).label)}</span>`}
     </div>
     <div class="c-fields">
       ${c.correo?`<div class="c-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg><span>${esc(c.correo)}</span></div>`:""}
@@ -507,13 +534,28 @@ function contactCard(c){
       ${c.ubicacion?`<div class="c-row met"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></svg><span>${esc(c.ubicacion)}${(c.lat!=null)?' · 📍':''}</span></div>`:""}
     </div>
     ${(c.etiquetas&&c.etiquetas.length)?`<div class="c-tags">${c.etiquetas.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}
+    ${c._revisar?`<div class="rev-actions"><button class="rev-btn" data-rev="${c.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Marcar revisado</button><button class="rev-btn ghost" data-dismiss="${c.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>Descartar</button><span class="rev-hint">Toca para completar</span></div>`:""}
+  </div>`;
+}
+function renderReview(list){
+  return `<div class="review">
+    <div class="review-head">
+      <div class="ri"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
+      <div class="rt">Por revisar</div>
+      <div class="rc">${list.length}</div>
+      <div class="rs">Importados de Google — completa los datos faltantes</div>
+    </div>
+    <div class="grid">${list.map(contactCard).join("")}</div>
   </div>`;
 }
 function render(){
   if(viewMap){viewMap.remove();viewMap=null;}
-  const list=filtered();
   const box=$("#content");
-  if(!list.length){
+  const pend=pendingReview();
+  const main=filtered().filter(c=>!c._revisar);
+  const reviewHtml=pend.length?renderReview(pend):"";
+
+  if(!main.length && !pend.length){
     box.innerHTML=`<div class="empty">
       <div class="ei"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg></div>
       <h3>${DB.cache.length?"Sin resultados":"Aún no hay contactos"}</h3>
@@ -522,12 +564,16 @@ function render(){
     </div>`;
     return;
   }
-  if(STATE.view==="map"){renderMap(list);return;}
-  if(STATE.view==="company"){
+  if(STATE.view==="map"){renderMap(main,reviewHtml);return;}
+
+  let mainHtml;
+  if(!main.length){
+    mainHtml=`<div class="count-note">No hay otros contactos.</div>`;
+  }else if(STATE.view==="company"){
     const map=new Map();
-    list.forEach(c=>{const k=companyKey(c)||"(Sin empresa)";if(!map.has(k))map.set(k,[]);map.get(k).push(c);});
+    main.forEach(c=>{const k=companyKey(c)||"(Sin empresa)";if(!map.has(k))map.set(k,[]);map.get(k).push(c);});
     const groups=[...map.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-    box.innerHTML=groups.map(([name,cs])=>`
+    mainHtml=groups.map(([name,cs])=>`
       <div class="company-group">
         <div class="company-head">
           <div class="cg-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9h.01M9 13h.01M9 17h.01"/></svg></div>
@@ -538,13 +584,26 @@ function render(){
         <div class="grid">${cs.map(contactCard).join("")}</div>
       </div>`).join("");
   }else{
-    const slice=list.slice(0,shown);
-    const more=list.length-slice.length;
-    box.innerHTML=`<div class="grid">${slice.map(contactCard).join("")}</div>`+
+    const slice=main.slice(0,shown);
+    const more=main.length-slice.length;
+    mainHtml=`<div class="grid">${slice.map(contactCard).join("")}</div>`+
       (more>0
         ? `<div class="more-wrap"><button class="btn" id="loadMore">Mostrar más · ${more} restantes</button></div>`
-        : `<div class="count-note">${list.length} contacto(s)</div>`);
+        : `<div class="count-note">${main.length} contacto(s)</div>`);
   }
+  box.innerHTML=reviewHtml+mainHtml;
+}
+
+async function markReviewed(id){
+  const c=DB.cache.find(x=>x.id===id);if(!c)return;
+  const data=Object.assign({},c);delete data._revisar;data.id=id;
+  try{await DB.save(data);toast("Marcado como revisado");renderStats();render();}
+  catch(e){toast("Error: "+e.message);}
+}
+async function dismissContact(id){
+  if(!confirm("¿Descartar este contacto? No se incluirá y no volverá a importarse de Google."))return;
+  try{await DB.ignore(id);toast("Contacto descartado");renderStats();render();}
+  catch(e){toast("Error: "+e.message);}
 }
 
 /* ════════════ MAPA ════════════ */
@@ -552,11 +611,11 @@ function pinIcon(color){
   return L.divIcon({className:"pin-wrap",iconSize:[30,40],iconAnchor:[15,38],popupAnchor:[0,-34],
     html:`<svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 0C7 0 0 6.6 0 14.7 0 25 15 40 15 40s15-15 15-25.3C30 6.6 23 0 15 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="15" cy="14.5" r="5.5" fill="#fff"/></svg>`});
 }
-function renderMap(list){
+function renderMap(list,prefix){
   const box=$("#content");
   const withLoc=list.filter(c=>c.lat!=null&&c.lng!=null);
   const noLoc=list.length-withLoc.length;
-  box.innerHTML=`<div class="map-wrap">
+  box.innerHTML=(prefix||"")+`<div class="map-wrap">
     <div id="bigMap" class="big-map"></div>
     <div class="legend">${Object.entries(TYPES).map(([k,v])=>`<div class="lg"><span class="lg-dot" style="background:${TYPE_COLORS[k]}"></span>${v.label}<b>${withLoc.filter(c=>(c.tipo||"otro")===k).length}</b></div>`).join("")}</div>
   </div>
@@ -670,7 +729,8 @@ function openForm(id){
       etiquetas:sheet.querySelector("#f_etiquetas").value.split(",").map(s=>s.trim()).filter(Boolean),
       notas:sheet.querySelector("#f_notas").value.trim()
     };
-    if(id){data.id=id;data.created=c.created;}
+    if(id){data.id=id;data.created=c.created;if(c._google)data._google=c._google;}
+    // (al guardar desde el formulario, _revisar se omite => queda revisado)
     sheet.querySelector("#saveBtn").disabled=true;
     try{await DB.save(data);toast(id?"Contacto actualizado":"Contacto agregado");close();renderStats();render();}
     catch(e){toast("Error al guardar: "+e.message);sheet.querySelector("#saveBtn").disabled=false;}
@@ -752,6 +812,10 @@ function toast(html){const w=$("#toasts");const t=document.createElement("div");
 function bindUI(){
   document.body.addEventListener("click",e=>{
     if(e.target.closest("#loadMore")){shown+=PAGE;render();return;}
+    const rev=e.target.closest("[data-rev]");
+    if(rev){e.stopPropagation();markReviewed(rev.dataset.rev);return;}
+    const dis=e.target.closest("[data-dismiss]");
+    if(dis){e.stopPropagation();dismissContact(dis.dataset.dismiss);return;}
     const card=e.target.closest(".contact");if(card)openForm(card.dataset.id);
   });
   $("#newBtn").onclick=()=>openForm();
@@ -778,6 +842,18 @@ function bindUI(){
   document.addEventListener("click",e=>{if(!menu.contains(e.target)&&!e.target.closest("#userChip"))menu.hidden=true;});
   $("#signoutBtn").onclick=signOut;
   $("#exportBtn").onclick=()=>{menu.hidden=true;exportCSV();};
+  $("#syncGoogleBtn").onclick=async()=>{
+    menu.hidden=true;
+    if(!USE_DRIVE()){toast("Necesitas el backend (APPS_SCRIPT_URL) configurado");return;}
+    if(!DB.cache.length){toast("No hay contactos para sincronizar");return;}
+    if(!confirm("Se copiarán todos los contactos a Google Contacts de la cuenta del backend, dentro del grupo \"Vertical Sayron\". ¿Continuar?"))return;
+    toast("Sincronizando con Google Contacts…");
+    try{
+      const r=await jsonp({action:"sync"},120000);
+      if(r&&r.ok){const x=r.result;toast(`Google: ${x.created} nuevos, ${x.updated} actualizados, ${x.imported} importados${x.failed?`, ${x.failed} con error`:""}`);await reload();}
+      else toast("No se pudo sincronizar: "+((r&&r.error)||"error"));
+    }catch(e){toast("Tardó demasiado; ejecuta «sincronizarGoogle» desde el editor de Apps Script.");}
+  };
   $("#openDrive").onclick=()=>{const id=APP_CONFIG.auth.DRIVE_FOLDER_ID;if(id&&!id.startsWith("ID_"))window.open(`https://drive.google.com/drive/folders/${id}`,"_blank");else toast("Configura DRIVE_FOLDER_ID.");};
   const hub=SITE.isPages?APP_CONFIG.tool.hubUrlPages:APP_CONFIG.tool.hubUrl;
   $("#brandLink").href=hub;$("#hubLink").href=hub;
