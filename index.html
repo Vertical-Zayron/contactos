@@ -363,6 +363,11 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
+/* ════════════ ENTORNO ════════════ */
+/* En GitHub Pages el ERP vive en otro repo (URL absoluta); en localhost es relativo. */
+const SITE={ isPages: location.hostname.endsWith("github.io"),
+             hub:"https://vertical-zayron.github.io/PlataformaVirtual/" };
+
 /* ════════════ CONFIGURACIÓN ════════════ */
 const APP_CONFIG={
   auth:{
@@ -371,8 +376,9 @@ const APP_CONFIG={
     APPS_SCRIPT_URL:"https://script.google.com/macros/s/AKfycbw3bKIvky0BdvaspcvLU0nLqq1Ck7zjrVet6XetdWXvrKJ6wXoXLG_r74xO4Y8-GfuCgw/exec"   // /exec del Web App
   },
   tool:{
-    collection:"contactos",   // carpeta propia de datos de esta herramienta
-    hubUrl:"index.html"       // página principal del ERP
+    collection:"contactos",                 // carpeta propia de datos de esta herramienta
+    hubUrl:"index.html",                     // ERP principal en localhost
+    hubUrlPages:"https://vertical-zayron.github.io/PlataformaVirtual/" // ERP principal en Pages
   }
 };
 
@@ -753,7 +759,8 @@ function bindUI(){
   $("#signoutBtn").onclick=signOut;
   $("#exportBtn").onclick=()=>{menu.hidden=true;exportCSV();};
   $("#openDrive").onclick=()=>{const id=APP_CONFIG.auth.DRIVE_FOLDER_ID;if(id&&!id.startsWith("ID_"))window.open(`https://drive.google.com/drive/folders/${id}`,"_blank");else toast("Configura DRIVE_FOLDER_ID.");};
-  $("#brandLink").href=APP_CONFIG.tool.hubUrl;$("#hubLink").href=APP_CONFIG.tool.hubUrl;
+  const hub=SITE.isPages?APP_CONFIG.tool.hubUrlPages:APP_CONFIG.tool.hubUrl;
+  $("#brandLink").href=hub;$("#hubLink").href=hub;
 }
 async function reload(){await DB.load();renderStats();render();}
 
