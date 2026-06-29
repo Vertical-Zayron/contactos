@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contactos · V-Sayron ERP</title>
+<title>Contactos · V-Zayron ERP</title>
 
 <!-- ════════════════════════════════════════════════════════════════
-     VERTICAL SAYRON ERP — HERRAMIENTA: CONTACTOS (clientes, proveedores…)
+     VERTICAL ZAYRON ERP — HERRAMIENTA: CONTACTOS (clientes, proveedores…)
      Archivo único para GitHub Pages. Datos en Drive vía Apps Script.
      Esta herramienta guarda en su PROPIA carpeta: colección "contactos".
 
@@ -286,7 +286,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
         <rect x="6" y="20" width="6" height="22" rx="2" fill="#0e94a8"/><rect x="16" y="12" width="6" height="30" rx="2" fill="#2d54d4"/><rect x="26" y="6" width="6" height="36" rx="2" fill="#16202c"/>
         <path d="M4 16 q6 -10 12 0 t12 0 t12 0" stroke="#16c6dc" stroke-width="2.4" fill="none" stroke-linecap="round"/>
       </svg>
-      <div class="a">Vertical Sayron</div>
+      <div class="a">Vertical Zayron</div>
       <div class="b">ERP · Contactos</div>
     </div>
     <div class="body">
@@ -316,7 +316,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
   <header class="topbar">
     <a class="brand" id="brandLink" href="index.html">
       <svg class="glyph" viewBox="0 0 48 48" fill="none" aria-hidden="true"><rect x="6" y="20" width="6" height="22" rx="2" fill="#0e94a8"/><rect x="16" y="12" width="6" height="30" rx="2" fill="#2d54d4"/><rect x="26" y="6" width="6" height="36" rx="2" fill="#16202c"/><path d="M4 16 q6 -10 12 0 t12 0 t12 0" stroke="#16c6dc" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
-      <span class="wm"><span class="a">V-Sayron</span><span class="b">Contactos</span></span>
+      <span class="wm"><span class="a">V-Zayron</span><span class="b">Contactos</span></span>
     </a>
     <div class="sep"></div>
     <a class="backhub" id="hubLink" href="index.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg><span>Herramientas</span></a>
@@ -343,7 +343,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 
   <main class="wrap">
     <section class="head">
-      <div class="eyebrow">Vertical Sayron · Base de datos</div>
+      <div class="eyebrow">Vertical Zayron · Base de datos</div>
       <h1>Contactos</h1>
       <p class="sub">Clientes, proveedores y prospectos — guardados en Drive y agrupados por empresa.</p>
       <div class="readout">
@@ -425,7 +425,7 @@ const $$=s=>document.querySelectorAll(s);
 
 /* ════════════ CAPA DE DATOS (Drive vía Apps Script, o localStorage) ════════════ */
 const USE_DRIVE=()=>!!APP_CONFIG.auth.APPS_SCRIPT_URL;
-const LS_KEY="sayron_contactos";
+const LS_KEY="zayron_contactos";
 function lsGet(){try{return JSON.parse(localStorage.getItem(LS_KEY))||[]}catch(e){return DB._mem||[]}}
 function lsSet(v){try{localStorage.setItem(LS_KEY,JSON.stringify(v))}catch(e){DB._mem=v}}
 
@@ -801,7 +801,7 @@ function exportCSV(){
   const rows=[cols.map(c=>cell(c[1])).join(",")].concat(list.map(c=>cols.map(col=>cell(c[col[0]])).join(",")));
   const blob=new Blob(["\uFEFF"+rows.join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-  a.download=`contactos-sayron-${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  a.download=`contactos-zayron-${new Date().toISOString().slice(0,10)}.csv`;a.click();
   toast(`Exportados ${list.length} contactos`);
 }
 
@@ -846,7 +846,7 @@ function bindUI(){
     menu.hidden=true;
     if(!USE_DRIVE()){toast("Necesitas el backend (APPS_SCRIPT_URL) configurado");return;}
     if(!DB.cache.length){toast("No hay contactos para sincronizar");return;}
-    if(!confirm("Se copiarán todos los contactos a Google Contacts de la cuenta del backend, dentro del grupo \"Vertical Sayron\". ¿Continuar?"))return;
+    if(!confirm("Se copiarán todos los contactos a Google Contacts de la cuenta del backend, dentro del grupo \"Vertical Zayron\". ¿Continuar?"))return;
     toast("Sincronizando con Google Contacts…");
     try{
       const r=await jsonp({action:"sync"},120000);
@@ -862,7 +862,7 @@ async function reload(){await DB.load();renderStats();render();}
 
 /* ════════════ AUTENTICACIÓN + VERIFICACIÓN (igual que el ERP) ════════════ */
 /* Sesión cacheada: token+perfil compartidos entre herramientas del mismo sitio */
-const AUTH_KEY="sayron_gauth",HINT_KEY="sayron_hint";
+const AUTH_KEY="zayron_gauth",HINT_KEY="zayron_hint";
 function saveAuth(token,expiresIn,profile){try{localStorage.setItem(AUTH_KEY,JSON.stringify({token,exp:Date.now()+(((expiresIn||3600)-60)*1000),profile}));}catch(e){}}
 function loadAuth(){try{const a=JSON.parse(localStorage.getItem(AUTH_KEY));if(a&&a.token&&a.exp>Date.now())return a;}catch(e){}return null;}
 function clearAuth(){try{localStorage.removeItem(AUTH_KEY);}catch(e){}}
@@ -878,7 +878,7 @@ function initAuth(){
   if(cid.startsWith("TU_CLIENT_ID")){
     $("#gateHint").innerHTML='⚠ Modo demo — configura CLIENT_ID y DRIVE_FOLDER_ID.';
     $("#signinLbl").textContent="Entrar en modo demo";
-    $("#signinBtn").addEventListener("click",()=>enterApp({name:"Usuario demo",email:"demo@sayron",picture:null},true));
+    $("#signinBtn").addEventListener("click",()=>enterApp({name:"Usuario demo",email:"demo@zayron",picture:null},true));
     return;
   }
   if(location.protocol==="file:"){
